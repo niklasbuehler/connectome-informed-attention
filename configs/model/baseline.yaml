@@ -2,7 +2,7 @@
 _target_: src.models.baseline_classifier.Classifier
 #batch_size: ${datamodule.batch_size} #specified in the global config.yaml of the patent caller
 # lr: 0.00021403010424021394
-#lr: 8.187824420871972e-05
+lr: 8.187824420871972e-05
 #weight_decay: 6.999268665944247e-06
 #expansion_ratio: 2
 #hidden_dimension: 192
