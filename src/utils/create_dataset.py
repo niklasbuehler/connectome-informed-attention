@@ -5,6 +5,8 @@ import numpy as np
 from itertools import combinations
 from termcolor import colored
 
+#       TO RUN:      python create_dataset.py -p <path_to_tabular_data> -o <output_path>
+
 #computes the difference in days
 def to_days_difference(ses):
     out = []
