@@ -36,16 +36,17 @@ def create_subject_sequences(df):
     dfs = {}
     for sub in subjects:
         temp = df[df.ID == sub].sort_values(by="ses").drop(columns=["ID"]).reset_index(drop=True)
-        schaefer_rois = temp.loc[:, 'SUVR.Schaefer200.ROI.idx.1':'SUVR.Schaefer200.ROI.idx.200']
-        df_sub = schaefer_rois
-        df_sub["sex"] = temp.sex
-        df_sub["age"] = temp.age
-        df_sub["ses"] = temp.ses
-        sub_sequences = create_sequences(df_sub)
-        for seq in sub_sequences:
-            seq["days_to_next"] = to_days_difference(list(seq.ses))
+        if len(temp)>1:
+            schaefer_rois = temp.loc[:, 'SUVR.Schaefer200.ROI.idx.1':'SUVR.Schaefer200.ROI.idx.200']
+            df_sub = schaefer_rois
+            df_sub["sex"] = temp.sex
+            df_sub["age"] = temp.age
+            df_sub["ses"] = temp.ses
+            sub_sequences = create_sequences(df_sub)
+            for seq in sub_sequences:
+                seq["days_to_next"] = to_days_difference(list(seq.ses))
 
-        dfs[sub] = sub_sequences
+            dfs[sub] = sub_sequences
 
     return dfs
 
