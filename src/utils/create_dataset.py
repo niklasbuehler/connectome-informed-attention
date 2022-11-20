@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 import numpy as np
 from itertools import combinations
 from termcolor import colored
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 #       TO RUN:      python create_dataset.py -p <path_to_tabular_data> -o <output_path>
 
@@ -108,20 +108,22 @@ if __name__ == '__main__':
     print(colored("Sequences successfully generated!", "green"))
 
     print("Scaling features ...")
-    age_scaler = StandardScaler()
+    age_scaler = MinMaxScaler((0, 1))
     age_scaler.fit(np.array(ages)[:, np.newaxis])
 
     sex_scaler = StandardScaler()
     sex_scaler.fit(np.array(sexes)[:, np.newaxis])
 
-    days_scaler = StandardScaler()
+    days_scaler = MinMaxScaler((0, 1))
     days_scaler.fit(np.array(days)[:, np.newaxis])
 
     for sub in dfs:
         for seq in dfs[sub]:
             seq["sex"] = sex_scaler.transform(np.array(seq.sex)[:, np.newaxis]).flatten()
             seq["age"] = age_scaler.transform(np.array(seq.age)[:, np.newaxis]).flatten()
-            seq["days_to_next"] = sex_scaler.transform(np.array(seq.days_to_next)[:, np.newaxis]).flatten()
+            sub_days = days_scaler.transform(np.array(seq.days_to_next)[:, np.newaxis]).flatten()
+            sub_days[-1] = 0
+            seq["days_to_next"] = sub_days
 
     print(colored("Scaling complete!", "green"))
 
