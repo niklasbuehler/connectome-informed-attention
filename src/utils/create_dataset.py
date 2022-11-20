@@ -4,6 +4,7 @@ from argparse import ArgumentParser
 import numpy as np
 from itertools import combinations
 from termcolor import colored
+from sklearn.preprocessing import StandardScaler
 
 #       TO RUN:      python create_dataset.py -p <path_to_tabular_data> -o <output_path>
 
@@ -32,6 +33,10 @@ def create_subject_sequences(df):
     # unique subject list
     subjects = list(df.ID.unique())
 
+    ages = []
+    days = []
+    sexes = []
+
     # every df is subject specific
     dfs = {}
     for sub in subjects:
@@ -39,16 +44,19 @@ def create_subject_sequences(df):
         if len(temp)>1:
             schaefer_rois = temp.loc[:, 'SUVR.Schaefer200.ROI.idx.1':'SUVR.Schaefer200.ROI.idx.200']
             df_sub = schaefer_rois
-            df_sub["sex"] = temp.sex
+            df_sub["sex"] = [1 if x == "F" else 0 for x in temp.sex]
             df_sub["age"] = temp.age
             df_sub["ses"] = temp.ses
+            ages += list(temp.age)
+            sexes.append(df_sub.sex.unique()[0])
+            days += to_days_difference(list(df_sub.ses))[:-1]
             sub_sequences = create_sequences(df_sub)
             for seq in sub_sequences:
                 seq["days_to_next"] = to_days_difference(list(seq.ses))
 
             dfs[sub] = sub_sequences
 
-    return dfs
+    return dfs, ages, days, sexes
 
 
 
@@ -96,8 +104,27 @@ if __name__ == '__main__':
 
     print("Generating subject sequences ...")
     #create the sequences for all subjects
-    dfs = create_subject_sequences(df)
+    dfs, ages, days, sexes = create_subject_sequences(df)
     print(colored("Sequences successfully generated!", "green"))
+
+    print("Scaling features ...")
+    age_scaler = StandardScaler()
+    age_scaler.fit(np.array(ages)[:, np.newaxis])
+
+    sex_scaler = StandardScaler()
+    sex_scaler.fit(np.array(sexes)[:, np.newaxis])
+
+    days_scaler = StandardScaler()
+    days_scaler.fit(np.array(days)[:, np.newaxis])
+
+    for sub in dfs:
+        for seq in dfs[sub]:
+            seq["sex"] = sex_scaler.transform(np.array(seq.sex)[:, np.newaxis]).flatten()
+            seq["age"] = age_scaler.transform(np.array(seq.age)[:, np.newaxis]).flatten()
+            seq["days_to_next"] = sex_scaler.transform(np.array(seq.days_to_next)[:, np.newaxis]).flatten()
+
+    print(colored("Scaling complete!", "green"))
+
 
     #create dataset path
     dataset_root = os.path.join(output_path, "tau_accumulation_sequences")
