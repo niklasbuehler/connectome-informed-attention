@@ -19,42 +19,50 @@ def to_days_difference(ses):
 
 
 # create all posslible sequences
-def create_sequences(df):
+def create_sequences(df, seq_id):
     sequences = []
+    counter = seq_id
     for i in range(2, len(df) + 1):
         for c in combinations([d for d in range(len(df))], i):
             idxs = [j for j in c]
-            sequences.append(df.loc[idxs].reset_index(drop=True))
+            sequence = pd.DataFrame({"SEQ_ID": [seq_id + counter for x in idxs]})
+            sequence = pd.concat([sequence, df.loc[idxs].reset_index(drop=True)], axis=1)
+            sequences.append(sequence)
+            counter += 1
 
-    return sequences
+    return sequences, counter
 
 #create a dictionary for all subjects with their respective sequences
 def create_subject_sequences(df):
     # unique subject list
     subjects = list(df.ID.unique())
 
+    dfs = []
+
     ages = []
     days = []
     sexes = []
 
-    # every df is subject specific
-    dfs = {}
+    seq_id = 0
+
     for sub in subjects:
-        temp = df[df.ID == sub].sort_values(by="ses").drop(columns=["ID"]).reset_index(drop=True)
-        if len(temp)>1:
-            schaefer_rois = temp.loc[:, 'SUVR.Schaefer200.ROI.idx.1':'SUVR.Schaefer200.ROI.idx.200']
-            df_sub = schaefer_rois
+        temp = df[df.ID == sub].sort_values(by="ses").reset_index(drop=True)
+        if len(temp) > 1:
+            df_sub = pd.DataFrame(temp.ID)
             df_sub["sex"] = [1 if x == "F" else 0 for x in temp.sex]
             df_sub["age"] = temp.age
             df_sub["ses"] = temp.ses
+            # print(df_sub.head())
             ages += list(temp.age)
             sexes.append(df_sub.sex.unique()[0])
             days += to_days_difference(list(df_sub.ses))[:-1]
-            sub_sequences = create_sequences(df_sub)
+            schaefer_rois = temp.loc[:, 'SUVR.Schaefer200.ROI.idx.1':'SUVR.Schaefer200.ROI.idx.200']
+            df_sub = pd.concat([df_sub, schaefer_rois], axis=1)
+            sub_sequences, seq_id = create_sequences(df_sub, seq_id)
             for seq in sub_sequences:
                 seq["days_to_next"] = to_days_difference(list(seq.ses))
 
-            dfs[sub] = sub_sequences
+            dfs += sub_sequences
 
     return dfs, ages, days, sexes
 
@@ -117,28 +125,22 @@ if __name__ == '__main__':
     days_scaler = MinMaxScaler((0, 1))
     days_scaler.fit(np.array(days)[:, np.newaxis])
 
-    for sub in dfs:
-        for seq in dfs[sub]:
-            seq["sex"] = sex_scaler.transform(np.array(seq.sex)[:, np.newaxis]).flatten()
-            seq["age"] = age_scaler.transform(np.array(seq.age)[:, np.newaxis]).flatten()
-            sub_days = days_scaler.transform(np.array(seq.days_to_next)[:, np.newaxis]).flatten()
-            sub_days[-1] = 0
-            seq["days_to_next"] = sub_days
+    for seq in dfs:
+        seq["sex"] = sex_scaler.transform(np.array(seq.sex)[:, np.newaxis]).flatten()
+        seq["age"] = age_scaler.transform(np.array(seq.age)[:, np.newaxis]).flatten()
+        sub_days = days_scaler.transform(np.array(seq.days_to_next)[:, np.newaxis]).flatten()
+        sub_days[-1] = 0
+        seq["days_to_next"] = sub_days
+
+    out = pd.concat([x for x in dfs]).reset_index(drop=True)
 
     print(colored("Scaling complete!", "green"))
 
-
-    #create dataset path
-    dataset_root = os.path.join(output_path, "tau_accumulation_sequences")
-    os.mkdir(dataset_root)
-
     print("Creating dir and saving ...")
-    #save sequences to root
-    for sub in dfs:
-        sub_path = os.path.join(dataset_root, sub)
-        os.mkdir(sub_path)
-        for i, seq in enumerate(dfs[sub]):
-            seq.to_csv(os.path.join(sub_path, str(i) + ".csv"), index=False)
+    #create dataset path
+    dataset_root = os.path.join(output_path, "tau_progression_sequences.csv")
+
+    out.to_csv(dataset_root, index=False)
     print(colored("Saved!", "green"))
     print(colored("all sequences created successfully!", "green"))
     print("created dataset path: " + os.path.abspath(dataset_root))
