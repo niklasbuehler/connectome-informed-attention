@@ -4,7 +4,7 @@ import pytorch_lightning as pl
 
 
 class Classifier(pl.LightningModule):
-    def __init__(self):
+    def __init__(self, lr: float = 0.000002):
         super().__init__()
         self.net = nn.Sequential(nn.Linear(200, 400),
                                  nn.ReLU(),
@@ -13,6 +13,7 @@ class Classifier(pl.LightningModule):
                                  nn.Linear(128, 3))
 
         self.criterion = nn.CrossEntropyLoss()
+        self.lr = lr
 
     def training_step(self, batch, batch_idx):
         x, y = batch
@@ -37,5 +38,5 @@ class Classifier(pl.LightningModule):
         # --------------------------
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-2)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         return optimizer
