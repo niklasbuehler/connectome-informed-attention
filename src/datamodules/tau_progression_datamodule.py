@@ -10,6 +10,7 @@ import torch
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import ConcatDataset, DataLoader, Dataset
 from torch.nn.utils.rnn import pad_sequence
+import numpy as np
 
 
 
@@ -33,13 +34,12 @@ class TauProgressionDataset(torch.utils.data.Dataset):
         df = pd.read_csv(os.path.join(dataset_path, dataset_filename))
         df = df[(df.ID.isin(subject_ids))].drop(columns=["ID", "ses"])
         self.sequences = []
-
         seq_ids = list(df.SEQ_ID.unique())
 
         for id in seq_ids:
             data = df[df.SEQ_ID == id].drop(columns=["SEQ_ID"]).reset_index(drop=True)
-            x = data.loc[:len(data) - 2].to_numpy()
-            y = data.loc[len(data) - 1].iloc[3:204].to_numpy()
+            x = data.loc[:len(data) - 2].to_numpy().astype(np.float32)
+            y = data.loc[len(data) - 1].iloc[3:204].to_numpy().astype(np.float32)
             self.sequences.append((x, y))
 
 
@@ -134,7 +134,7 @@ def collate(batch):
         To be passed to DataLoader as the `collate_fn` argument
     """
     assert isinstance(batch, list)
-    data = pad_sequence([b['data'] for b in batch])
+    data = pad_sequence([b['data'] for b in batch], batch_first=True)
     lengths = torch.tensor([len(b['data']) for b in batch])
     label = torch.stack([b['label'] for b in batch])
     return {
