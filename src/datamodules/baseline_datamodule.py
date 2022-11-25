@@ -86,7 +86,7 @@ class SchaeferDataModule(LightningDataModule):
         # load datasets only if they're not loaded already
         if not self.data_train and not self.data_val and not self.data_test:
             X = self.df.loc[:, 'SUVR.Schaefer200.ROI.idx.1':'SUVR.Schaefer200.ROI.idx.200'].to_numpy()
-            y = self.df.loc[:, "Diagnostic"]
+            y = self.df.loc[:, "DX"]
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, stratify=y)
             X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.1, stratify=y_train)
             self.data_train = SchaeferDataset(X_train, y_train)

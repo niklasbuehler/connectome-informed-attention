@@ -6,7 +6,11 @@ from torchmetrics import MaxMetric
 from typing import Any, List
 
 class Classifier(pl.LightningModule):
+<<<<<<< HEAD
     def __init__(self, lr, n):
+=======
+    def __init__(self, lr: float = 0.000002):
+>>>>>>> c2776d353ce6d85e596714d56c59f0a5445d5ba4
         super().__init__()
         self.lr = lr
         self.net = nn.Sequential(nn.Linear(200, 512),
@@ -20,6 +24,7 @@ class Classifier(pl.LightningModule):
         self.test_acc = Accuracy()
         self.val_acc_best = MaxMetric()
         self.criterion = nn.CrossEntropyLoss()
+        self.lr = lr
 
     def step(self, batch: Any):
         x, y = batch
@@ -57,5 +62,4 @@ class Classifier(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", patience=5, factor=0.5)
-        return {"optimizer": optimizer, "lr_scheduler": scheduler, "monitor": "val_acc"}
+        return optimizer
