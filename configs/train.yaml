@@ -3,8 +3,8 @@
 # specify here default training configuration
 defaults:
   - _self_
-  - datamodule: baseline.yaml
-  - model: baseline.yaml
+  - datamodule: tau_progression_datamodule.yaml
+  - model: tau_progression_prediction_lstm.yaml
   - callbacks: default.yaml
   - logger: tensorboard.yaml # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default.yaml
@@ -18,7 +18,8 @@ defaults:
   - debug: null
 
   # config for hyperparameter optimization
-  - hparams_search: mvt_optuna.yaml
+  - hparams_search: baseline_optuna.yaml
+
 
   # optional local config for machine/user specific settings
   # it's optional since it doesn't need to exist and is excluded from version control

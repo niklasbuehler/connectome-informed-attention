@@ -3,8 +3,8 @@ _target_: pytorch_lightning.Trainer
 gpus: 0
 
 min_epochs: 1
-max_epochs: 1000
-overfit_batches: 5
+max_epochs: 100000
+overfit_batches: 1
 val_check_interval: 0.5
 
 # number of validation steps to execute at the beginning of the training

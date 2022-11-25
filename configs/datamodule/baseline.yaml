@@ -2,6 +2,6 @@ _target_: src.datamodules.baseline_datamodule.SchaeferDataModule
 
 ##TODO: change params here
 data_dir: ${data_dir}/schaefer_data.csv # data_dir is specified in config.yaml of the parent caller
-batch_size: 32
+batch_size: 4
 num_workers: 0
 pin_memory: False
