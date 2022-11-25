@@ -1,41 +1,61 @@
 import torch
 from torch import nn
 import pytorch_lightning as pl
-
+from torchmetrics.classification.accuracy import Accuracy
+from torchmetrics import MaxMetric
+from typing import Any, List
 
 class Classifier(pl.LightningModule):
-    def __init__(self):
+    def __init__(self, lr, n):
         super().__init__()
-        self.net = nn.Sequential(nn.Linear(200, 400),
+        self.lr = lr
+        self.net = nn.Sequential(nn.Linear(200, 512),
                                  nn.ReLU(),
-                                 nn.Linear(400, 128),
+                                 nn.Linear(512, 256),
                                  nn.ReLU(),
-                                 nn.Linear(128, 3))
+                                 nn.Linear(256, 3))
 
+        self.train_acc = Accuracy()
+        self.val_acc = Accuracy()
+        self.test_acc = Accuracy()
+        self.val_acc_best = MaxMetric()
         self.criterion = nn.CrossEntropyLoss()
 
-    def training_step(self, batch, batch_idx):
+    def step(self, batch: Any):
         x, y = batch
-        z = self.net(x)
-        loss = self.criterion(z, y)
-        self.log('train_loss', loss)
-        return loss
-        # --------------------------
+        logits = self.net(x)
+        loss = self.criterion(logits, y)
+        preds = torch.argmax(logits, dim=1)
+        return loss, preds, y
+
+    def training_step(self, batch, batch_idx):
+        loss, preds, targets = self.step(batch)
+        acc = self.train_acc(preds, targets)
+        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False)
+        self.log("train_acc", acc, on_step=False, on_epoch=True, prog_bar=True)
+        return {"loss": loss, "preds": preds, "targets": targets}
+
 
     def validation_step(self, batch, batch_idx):
-        x, y = batch
-        z = self.net(x)
-        loss = self.criterion(z, y)
-        self.log('val_loss', loss)
-        # --------------------------
+        loss, preds, targets = self.step(batch)
+        acc = self.val_acc(preds, targets)
+        self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=False)
+        self.log("val_acc", acc, on_step=False, on_epoch=True, prog_bar=True)
+        return {"loss": loss, "preds": preds, "targets": targets}
+
+    def validation_epoch_end(self, outputs: List[Any]):
+        acc = self.val_acc.compute()  # get val accuracy from current epoch
+        self.val_acc_best.update(acc)
+        self.log("val/acc_best", self.val_acc_best.compute(), on_epoch=True, prog_bar=True)
 
     def test_step(self, batch, batch_idx):
-        x, y = batch
-        z = self.net(x)
-        loss = self.criterion(z, y)
-        self.log('test_loss', loss)
-        # --------------------------
+        loss, preds, targets = self.step(batch)
+        acc = self.test_acc(preds, targets)
+        self.log("test_loss", loss, on_step=False, on_epoch=True, prog_bar=False)
+        self.log("test_acc", acc, on_step=False, on_epoch=True, prog_bar=True)
+        return {"loss": loss, "preds": preds, "targets": targets}
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-2)
-        return optimizer
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", patience=5, factor=0.5)
+        return {"optimizer": optimizer, "lr_scheduler": scheduler, "monitor": "val_acc"}
