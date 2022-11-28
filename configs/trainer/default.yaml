@@ -4,7 +4,7 @@ gpus: [5]
 #accelerator: "gpu"
 
 min_epochs: 1
-max_epochs: 50
+max_epochs: 200
 
 # number of validation steps to execute at the beginning of the training
 # num_sanity_val_steps: 0
