@@ -4,7 +4,7 @@
 defaults:
   - _self_
   - datamodule: tau_progression_datamodule.yaml
-  - model: tau_progression_prediction_lstm.yaml
+  - model: tau_progression_prediction_transformer.yaml
   - callbacks: default.yaml
   - logger: tensorboard.yaml # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default.yaml
