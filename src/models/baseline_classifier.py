@@ -6,11 +6,7 @@ from torchmetrics import MaxMetric
 from typing import Any, List
 
 class Classifier(pl.LightningModule):
-<<<<<<< HEAD
-    def __init__(self, lr, n):
-=======
     def __init__(self, lr: float = 0.000002):
->>>>>>> c2776d353ce6d85e596714d56c59f0a5445d5ba4
         super().__init__()
         self.lr = lr
         self.net = nn.Sequential(nn.Linear(200, 512),
