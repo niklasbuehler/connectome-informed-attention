@@ -42,9 +42,9 @@ hydra:
 
     # define range of hyperparameters
     params:
-      model.d_model: choice(16, 32, 64, 128, 256, 512)
-      model.d_hid: choice(16, 32, 64, 128, 256, 512)
-      model.n_heads: choice(1, 2, 4, 8)
-      model.n_layers: choice(1, 2, 4, 8)
-      model.lr: interval(0.0001, 0.05)
-      model.dropout: interval(0.0, 0.5)
+      model.d_model: choice(128, 256, 512)
+      model.d_hid: choice(128, 256, 512)
+      model.n_heads: choice(2, 4, 8)
+      model.n_layers: choice(1, 2, 4)
+      model.lr: interval(0.01, 0.1)
+      model.dropout: interval(0.0, 0.25)
