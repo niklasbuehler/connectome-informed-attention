@@ -1,6 +1,5 @@
 import math
 from typing import Any
-
 import pytorch_lightning as pl
 import torch
 from torch import nn, Tensor
@@ -13,6 +12,26 @@ def generate_square_subsequent_mask(sz: int) -> Tensor:
 
 
 class PositionalEncoding(nn.Module):
+    """
+    The Positional Embedding module adds a constant term to each element of the input.
+    This term is dependent on the position and encodes it as frequencies.
+
+    https://kazemnejad.com/blog/transformer_architecture_positional_encoding/
+
+    Attributes
+    ----------
+    d_model : int
+        The input and output dimension of this layer.
+    dropout : float
+        The dropout value.
+    max_len : int
+        The maximum sequence length.
+
+    Methods
+    -------
+    forward(x)
+        Adds the positional encoding to the input and applies dropout.
+    """
 
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 64):
         super().__init__()
@@ -35,6 +54,40 @@ class PositionalEncoding(nn.Module):
 
 
 class TransformerModel(pl.LightningModule):
+    """
+    This module is an implementation of the Transformer architecture presented in the paper "Attention is All You Need".
+    We don't use token embedding and replace this embedding step with simple feedforward embedding instead.
+    As a criterion, MSE Loss is used.
+
+    https://arxiv.org/abs/1706.03762
+
+    Attributes
+    ----------
+    d_in : int
+        The input dimension (here: 203).
+    d_model : int
+        The dimension of the space the input is embedded into.
+        This is also the dimension of the expected features in the encoder/decoder inputs.
+    d_hid : int
+        The dimension to use in the feedforward network.
+    d_out : int
+        The output dimension (here: 200).
+    n_heads : int
+        The number of heads in the multiheadattention models.
+    n_layers : int
+        The number of sub-encoder-layers in the encoder.
+    lr : float
+        The learning rate.
+    dropout : float
+        The dropout value.
+
+    Methods
+    -------
+    init_weights()
+        Initializes the weights randomly and sets the biases to zero.
+    forward(src, src_mask)
+        Performs a forward pass through the model.
+    """
 
     def __init__(self, d_in: int, d_model: int, d_hid: int, d_out: int, n_heads: int, n_layers: int, lr: float,
                  dropout: float = 0.5):
@@ -64,11 +117,14 @@ class TransformerModel(pl.LightningModule):
     def forward(self, src: Tensor, src_mask: Tensor) -> Tensor:
         """
         Args:
-            src: Tensor, shape [seq_len, batch_size, d_in]
-            src_mask: Tensor, shape [seq_len, seq_len]
+            src: Tensor of shape [seq_len, batch_size, d_in]
+                The model input.
+            src_mask: Tensor of shape [seq_len, seq_len]
+                The square attention mask is required because the self-attention layers are only allowed to attend the
+                earlier positions in the sequence.
 
         Returns:
-            output Tensor of shape [seq_len, batch_size, d_out]
+            output: Tensor of shape [seq_len, batch_size, d_out]
         """
         src = self.encoder(src) * math.sqrt(self.d_model)
         src = self.pos_encoder(src)
