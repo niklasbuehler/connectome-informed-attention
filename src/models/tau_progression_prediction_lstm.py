@@ -17,7 +17,7 @@ class LSTMRegressor(pl.LightningModule):
         self.linear = nn.Linear(hidden_size, 200)
 
         self.criterion = nn.MSELoss()
-
+        self.test_acc = Accuracy()
     def forward(self, sequence, lengths):
         input = pack_padded_sequence(sequence, lengths, batch_first=True, enforce_sorted=False)
         x, (h, _) = self.lstm1(input)
@@ -34,26 +34,30 @@ class LSTMRegressor(pl.LightningModule):
         x, y, lengths = batch["data"], batch["label"], batch["lengths"]
         logits = self.forward(x, lengths.cpu())
         loss = self.criterion(logits, y)
-        preds = torch.argmax(logits, dim=1)
-        return loss, preds, y
+        return loss, logits, y
 
     def training_step(self, batch, batch_idx):
-        loss, preds, targets = self.step(batch)
+        loss, logits, targets = self.step(batch)
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False)
-        return {"loss": loss, "preds": preds, "targets": targets}
+        return {"loss": loss, "logits": logits, "targets": targets}
 
 
     def validation_step(self, batch, batch_idx):
-        loss, preds, targets = self.step(batch)
+        loss, logits, targets = self.step(batch)
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=False)
-        return {"loss": loss, "preds": preds, "targets": targets}
+        return {"loss": loss, "logits": logits, "targets": targets}
 
     def test_step(self, batch, batch_idx):
-        loss, preds, targets = self.step(batch)
+        loss, logits, targets = self.step(batch)
+        target_tau_positivity = (torch.mean(targets.float(), dim=1)>1.3).int()
+        preds_tau_positivity = (torch.mean(logits.float(), dim=1) > 1.3).int()
+        acc = self.test_acc(preds_tau_positivity, target_tau_positivity)
         self.log("test_loss", loss, on_step=False, on_epoch=True, prog_bar=False)
-        return {"loss": loss, "preds": preds, "targets": targets}
+        self.log("test_acc", acc, on_step=False, on_epoch=True, prog_bar=True)
+        return {"loss": loss, "logits": logits, "targets": targets}
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", patience=5, factor=0.5)
         return {"optimizer": optimizer, "lr_scheduler": scheduler, "monitor": "val_loss"}
+
