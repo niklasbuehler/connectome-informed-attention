@@ -5,9 +5,9 @@ d_in: 203
 d_out: 200
 
 # Tunable
-d_model: 100
+d_model: 128
 d_hid: 100
-n_heads: 2
+n_heads: 8
 n_layers: 2
 lr: 0.0001
 dropout: 0.2
