@@ -31,7 +31,7 @@ hydra:
     direction: minimize
 
     # total number of runs that will be executed
-    n_trials: 10
+    n_trials: 20
 
     # choose Optuna hyperparameter sampler
     # docs: https://optuna.readthedocs.io/en/stable/reference/samplers.html
@@ -42,9 +42,9 @@ hydra:
 
     # define range of hyperparameters
     params:
-      model.d_model: choice(128, 256)
-      model.d_hid: choice(128, 256)
-      model.n_heads: choice(2, 4, 8)
-      model.n_layers: choice(1, 2, 3)
+      model.d_model: choice(64, 128, 256, 512)
+      model.d_hid: choice(64, 128, 256, 512)
+      model.n_heads: choice(1, 2, 4, 8)
+      model.n_layers: choice(1, 2, 3, 4)
       model.lr: interval(0.0001, 0.1)
       model.dropout: interval(0.0, 0.25)

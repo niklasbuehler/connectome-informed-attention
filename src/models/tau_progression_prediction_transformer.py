@@ -4,6 +4,7 @@ import pytorch_lightning as pl
 import torch
 from torch import nn, Tensor
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
+from torchmetrics import Accuracy
 
 
 def generate_square_subsequent_mask(sz: int) -> Tensor:
@@ -104,7 +105,9 @@ class TransformerModel(pl.LightningModule):
         encoder_layers = TransformerEncoderLayer(d_model, n_heads, d_hid, dropout)
         self.transformer_encoder = TransformerEncoder(encoder_layers, n_layers)
         self.decoder = nn.Linear(d_model, d_out)
+
         self.criterion = nn.MSELoss()
+        self.test_acc = Accuracy()
 
         self.init_weights()
 
@@ -124,11 +127,12 @@ class TransformerModel(pl.LightningModule):
                 earlier positions in the sequence.
 
         Returns:
-            output: Tensor of shape [seq_len, batch_size, d_out]
+            output: Tensor of shape [batch_size, d_out]
         """
         src = self.encoder(src) * math.sqrt(self.d_model)
         src = self.pos_encoder(src)
         output = self.transformer_encoder(src, src_mask)
+        output = torch.mean(output, dim=0)
         output = self.decoder(output)
         return output
 
@@ -138,23 +142,26 @@ class TransformerModel(pl.LightningModule):
         src_mask = generate_square_subsequent_mask(x.size(0))
         logits = self.forward(x.cuda(), src_mask.cuda())
         loss = self.criterion(logits, y)
-        preds = torch.argmax(logits, dim=1)
-        return loss, preds, y
+        return loss, logits, y
 
     def training_step(self, batch, batch_idx):
-        loss, preds, targets = self.step(batch)
-        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
-        return {"loss": loss, "preds": preds, "targets": targets}
+        loss, logits, targets = self.step(batch)
+        self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False)
+        return {"loss": loss, "logits": logits, "targets": targets}
 
     def validation_step(self, batch, batch_idx):
-        loss, preds, targets = self.step(batch)
+        loss, logits, targets = self.step(batch)
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=False)
-        return {"loss": loss, "preds": preds, "targets": targets}
+        return {"loss": loss, "logits": logits, "targets": targets}
 
     def test_step(self, batch, batch_idx):
-        loss, preds, targets = self.step(batch)
+        loss, logits, targets = self.step(batch)
+        target_tau_positivity = (torch.mean(targets.float(), dim=1) > 1.3).int()
+        preds_tau_positivity = (torch.mean(logits.float(), dim=1) > 1.3).int()
+        acc = self.test_acc(preds_tau_positivity, target_tau_positivity)
         self.log("test_loss", loss, on_step=False, on_epoch=True, prog_bar=False)
-        return {"loss": loss, "preds": preds, "targets": targets}
+        self.log("test_acc", acc, on_step=False, on_epoch=True, prog_bar=True)
+        return {"loss": loss, "logits": logits, "targets": targets}
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
