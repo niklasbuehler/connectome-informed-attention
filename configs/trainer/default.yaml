@@ -1,10 +1,10 @@
 _target_: pytorch_lightning.Trainer
 
-gpus: [3]
+gpus: [2]
 #accelerator: "gpu"
 
 min_epochs: 1
-max_epochs: 30
+max_epochs: 100 # 25 for quick testing, 100 for comparing
 
 # number of validation steps to execute at the beginning of the training
 # num_sanity_val_steps: 0
