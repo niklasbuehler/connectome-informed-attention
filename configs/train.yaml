@@ -4,7 +4,7 @@
 defaults:
   - _self_
   - datamodule: tau_progression_datamodule_transformer.yaml
-  - model: tau_progression_prediction_triformer.yaml
+  - model: tau_progression_prediction_transformer_connectome_head.py
   - callbacks: default.yaml
   - logger: tensorboard.yaml # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default.yaml
@@ -18,7 +18,7 @@ defaults:
   - debug: null
 
   # config for hyperparameter optimization
-  - hparams_search: baseline_optuna.yaml
+  - hparams_search: transformer_optuna_full.yaml
 
 
   # optional local config for machine/user specific settings

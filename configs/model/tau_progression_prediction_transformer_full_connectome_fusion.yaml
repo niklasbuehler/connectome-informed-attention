@@ -8,7 +8,7 @@ d_out: 200
 d_model: 128
 d_hid: 100
 max_len: 10
-n_encoder_heads: 2
+n_encoder_heads: 4
 n_encoder_layers: 2
 lr: 0.001
 activation: "gelu"

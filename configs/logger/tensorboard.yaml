@@ -2,7 +2,7 @@
 
 tensorboard:
   _target_: pytorch_lightning.loggers.tensorboard.TensorBoardLogger
-  save_dir: "tensorboard/"
+  save_dir: "tensorboard/connectome_head"
   name: tb_logger
   version: ${name}
   log_graph: False

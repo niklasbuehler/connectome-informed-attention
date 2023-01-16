@@ -57,6 +57,64 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:x.size(0)]
         return self.dropout(x)
 
+class MultiheadAttention_mod(nn.Module):
+    def __init__(self, input_dim, embed_dim, num_heads, fixed_matrix):
+        super().__init__()
+        assert embed_dim % num_heads == 0, "Embedding dimension must be 0 modulo number of heads."
+
+        self.embed_dim = embed_dim * num_heads # for heads to be big enough to incorporate and encode the connectivtz matrix we will set embed dimension to 800
+        self.num_heads = num_heads
+        self.head_dim = self.embed_dim // num_heads
+        self.fixed_matrix = fixed_matrix
+
+        # Stack all weight matrices 1...h together for efficiency
+        # Note that in many implementations you see "bias=False" which is optional
+        self.qkv_proj = nn.Linear(input_dim, ((3 * self.embed_dim) - self.head_dim))
+        self.connectivity = nn.Linear(input_dim, self.head_dim) #here the important part is that we think about the dimensionality of the connectivtz
+        self.o_proj = nn.Linear(self.embed_dim, embed_dim)
+
+        self._reset_parameters()
+
+    @staticmethod
+    def scaled_dot_product(q, k, v, mask=None):
+        d_k = q.size()[-1]
+        attn_logits = torch.matmul(q, k.transpose(-2, -1))
+        attn_logits = attn_logits / math.sqrt(d_k)
+        if mask is not None:
+            attn_logits = attn_logits.masked_fill(mask == 0, -9e15)
+        attention = F.softmax(attn_logits, dim=-1)
+        values = torch.matmul(attention, v)
+        return values, attention
+
+    def _reset_parameters(self):
+        # Original Transformer initialization, see PyTorch documentation
+        nn.init.xavier_uniform_(self.qkv_proj.weight)
+        self.qkv_proj.bias.data.fill_(0)
+        nn.init.xavier_uniform_(self.o_proj.weight)
+        self.o_proj.bias.data.fill_(0)
+        # here i add the connectivty information to the network
+        self.connectivity.weight = nn.Parameter(self.fixed_matrix)
+        self.connectivity.weight.requires_grad = False
+        self.connectivity.bias.requires_grad = False
+
+    def forward(self, x, mask=None, return_attention=False):
+        seq_length, batch_size, embed_dim = x.size()
+        qkv = self.qkv_proj(x)
+        q_connectome = self.connectivity(x)
+        qkv = torch.cat((q_connectome, qkv), 2)
+        # Separate Q, K, V from linear output
+        qkv = qkv.reshape(batch_size, seq_length, self.num_heads, 3 * self.head_dim)
+        qkv = qkv.permute(0, 2, 1, 3)  # [Batch, Head, SeqLen, Dims]
+        q, k, v = qkv.chunk(3, dim=-1)
+
+        # Determine value outputs
+        values, attention = self.scaled_dot_product(q, k, v)
+        values = values.permute(0, 2, 1, 3)  # [Batch, SeqLen, Head, Dims] it should be (seq_len, batch_size, d_model)
+        values = values.reshape(batch_size, seq_length, self.embed_dim)
+        o = self.o_proj(values)
+        o1 = o.permute(2, 0 , 1)
+        o = o.permute(1, 0 , 2)
+        return o
 class TransformerBatchNormEncoderLayer(nn.modules.Module):
     r"""This transformer encoder layer block is made up of self-attn and feedforward network.
     It differs from TransformerEncoderLayer in torch/nn/modules/transformer.py in that it replaces LayerNorm
@@ -71,7 +129,8 @@ class TransformerBatchNormEncoderLayer(nn.modules.Module):
 
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1, activation="relu"):
         super(TransformerBatchNormEncoderLayer, self).__init__()
-        self.self_attn = MultiheadAttention(d_model, nhead, dropout=dropout)
+        connectivity = self.create_connectome_matrix()
+        self.self_attn = MultiheadAttention_mod(d_model, d_model, nhead, connectivity)
         # Implementation of Feedforward model
         self.linear1 = Linear(d_model, dim_feedforward)
         self.dropout = Dropout(dropout)
@@ -89,18 +148,22 @@ class TransformerBatchNormEncoderLayer(nn.modules.Module):
         # Initialize weights of attention mechanism
         #print("W shape: ", self.self_attn.in_proj_weight.data.shape) # (d_model*3, d_model) = (200*3, 200)
         print("Normalized Connectome: ", self.connectome)
-        rest_of_attn = self.self_attn.in_proj_weight[200:, :]
-        self.self_attn.in_proj_weight.data = torch.cat((self.connectome, rest_of_attn), 0)
+        #rest_of_attn = self.self_attn.in_proj_weight[200:, :]
+        #self.self_attn.in_proj_weight.data = torch.cat((self.connectome, rest_of_attn), 0)
+        self.self_attn._reset_parameters()
         #print("W new shape: ", self.self_attn.in_proj_weight.data.shape) # (d_model*3, d_model)
 
-    def create_connectome_matrix(self):
-        #mat = torch.tensor(pd.read_csv("/u/home/bue/Documents/connectome-based-tau-spread-prediction/data/Connectome_mean_rs3scaled_1065.csv", header=None).values)
-        mat = torch.tensor(pd.read_csv("/u/home/bue/Documents/connectome-based-tau-spread-prediction/data/N69_HC_functional_connectivity.csv", header=None).values)
+    def create_connectome_matrix(self,extend=False):
+        wtf = pd.read_csv("/home/andreszapata/devel/connectome-based-tau-spread-prediction/data/connectivity.csv")
+        mat = torch.tensor(wtf.values)
+        #mat = torch.tensor(pd.read_csv("/home/andreszapata/devel/connectome-based-tau-spread-prediction/data/connectivity.csv", header=None).values)
+        #mat = torch.tensor(pd.read_csv("/home/andreszapata/devel/connectome-based-tau-spread-prediction/data/connectivity.csv", header=None).values)
         # extend with identity matrix
-        mat = torch.cat((torch.zeros(3, 200), mat), 0)
-        mat = torch.cat((torch.zeros(203, 3), mat), 1)
-        mat = mat + torch.eye(203, 203)
-        #mat = normalize(mat)
+        if extend:
+            mat = torch.cat((torch.zeros(3, 200), mat), 0)
+            mat = torch.cat((torch.zeros(203, 3), mat), 1)
+            mat = mat + torch.eye(203, 203)
+        mat = normalize(mat)
         return mat.float()
 
     def __setstate__(self, state):
@@ -118,8 +181,7 @@ class TransformerBatchNormEncoderLayer(nn.modules.Module):
         Shape:
             see the docs in Transformer class.
         """
-        src2 = self.self_attn(src, src, src, attn_mask=src_mask,
-                              key_padding_mask=src_key_padding_mask)[0]
+        src2 = self.self_attn(src, src, src)[0]
         src = src + self.dropout1(src2)  # (seq_len, batch_size, d_model)
         src = src.permute(1, 2, 0)  # (batch_size, d_model, seq_len)
         # src = src.reshape([src.shape[0], -1])  # (batch_size, seq_length * d_model)
@@ -219,19 +281,23 @@ class TransformerModelFullConnAtt(pl.LightningModule):
         self.dropout = nn.Dropout(dropout)
 
         self.criterion = nn.MSELoss()
-        self.test_acc = Accuracy()
-        self.val_acc = Accuracy()
+        self.test_acc = Accuracy(num_classes=3,task="multiclass")
+        self.val_acc = Accuracy(num_classes=3, task="multiclass")
 
-        self.connectome = self.create_connectome_matrix()
+        self.connectome = self.create_connectome_matrix(extend=True)
 
         self.init_weights()
 
-    def create_connectome_matrix(self):
-        mat = torch.tensor(pd.read_csv("/u/home/bue/Documents/connectome-based-tau-spread-prediction/data/Connectome_mean_rs3scaled_1065.csv", header=None).values)
+    def create_connectome_matrix(self, extend=False):
+        #wtf = pd.read_csv("/home/andreszapata/devel/connectome-based-tau-spread-prediction/data/connectivity.csv", header=None)
+        #mat = torch.tensor(wtf.values)
+        wtf = pd.read_csv("/home/andreszapata/devel/connectome-based-tau-spread-prediction/data/connectivity.csv")
+        mat = torch.tensor(wtf.values)
         # extend with identity matrix
-        mat = torch.cat((torch.zeros(3, 200), mat), 0)
-        mat = torch.cat((torch.zeros(203, 3), mat), 1)
-        mat = mat + torch.eye(203, 203)
+        if extend:
+            mat = torch.cat((torch.zeros(3, 200), mat), 0)
+            mat = torch.cat((torch.zeros(203, 3), mat), 1)
+            mat = mat + torch.eye(203, 203)
         mat = normalize(mat)
         return mat.float()
 
