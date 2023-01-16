@@ -1,0 +1,25 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=example
+
+defaults:
+  - override /model: tau_progression_prediction_triformer.yaml
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+# name of the run determines folder name in logs
+name: "triformer"
+model:
+  d_model: 128
+  d_hid: 32
+  n_encoder_heads: 8
+  n_encoder_layers: 1
+  lr: 0.05
+  transformer_dropout: 0.1
+  dropout: 0.135
+  activation: "gelu"
+
+datamodule:
+  batch_size: 8
