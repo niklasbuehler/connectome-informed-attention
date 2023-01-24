@@ -14,12 +14,12 @@ name: "triformer"
 model:
   d_model: 128
   d_hid: 32
-  n_encoder_heads: 8
-  n_encoder_layers: 1
-  lr: 0.05
-  transformer_dropout: 0.1
-  dropout: 0.135
-  activation: "gelu"
+  n_encoder_heads: 2
+  n_encoder_layers: 3
+  lr: 0.02525305135295388
+  transformer_dropout: 0.1988994023569542
+  dropout: 0.12035132392670787
+  activation: "relu"
 
 datamodule:
   batch_size: 8

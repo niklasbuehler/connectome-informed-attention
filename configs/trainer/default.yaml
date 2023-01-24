@@ -4,7 +4,7 @@ gpus: [0]
 #accelerator: "gpu"
 
 min_epochs: 1
-max_epochs: 100 # 25 for quick testing, 100 for comparing
+max_epochs: 25 # 25 for quick testing, 100 for comparing
 
 # number of validation steps to execute at the beginning of the training
 # num_sanity_val_steps: 0
