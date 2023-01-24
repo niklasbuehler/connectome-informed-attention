@@ -1,0 +1,16 @@
+_target_: src.models.tau_progression_prediction_transformer_full_connectome_fusion_multi.TransformerModelFullConnFusionMulti
+
+# Given
+d_in: 203
+d_out: 200
+
+# Tunable
+d_model: 128
+d_hid: 32
+max_len: 10
+n_encoder_heads: 2
+n_encoder_layers: 4
+lr: 0.0641181896641661
+activation: "gelu"
+transformer_dropout: 0.35601296960476736
+dropout: 0.2416644775485848
