@@ -7,10 +7,10 @@ max_len: 10
 
 # Tunable
 d_model: 128
-d_hid: 100
+d_hid: 32
 n_encoder_heads: 2
-n_encoder_layers: 2
-lr: 0.001
-activation: "gelu"
-transformer_dropout: 0.2
-dropout: 0.2
+n_encoder_layers: 3
+lr: 0.02525305135295388
+transformer_dropout: 0.1988994023569542
+dropout: 0.12035132392670787
+activation: "relu"

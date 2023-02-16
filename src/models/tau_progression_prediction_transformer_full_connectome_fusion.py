@@ -9,6 +9,9 @@ from torchmetrics.classification.accuracy import Accuracy
 from torch.nn import TransformerEncoder, BatchNorm1d, TransformerEncoderLayer, Dropout, Linear, MultiheadAttention
 import pandas as pd
 from torch.nn.functional import normalize
+import numpy as np
+from matplotlib import pyplot
+import pickle
 
 def generate_square_subsequent_mask(sz: int) -> Tensor:
     """Generates an upper-triangular matrix of -inf, with zeros on diag."""
@@ -206,6 +209,7 @@ class TransformerModelFullConnFusion(pl.LightningModule):
         self.dropout = nn.Dropout(dropout)
 
         self.criterion = nn.MSELoss()
+        self.l1loss = nn.L1Loss()
         self.test_acc = Accuracy()
         self.val_acc = Accuracy()
 
@@ -260,21 +264,22 @@ class TransformerModelFullConnFusion(pl.LightningModule):
         return output
 
     def step(self, batch: Any):
-        x, y, masks = batch
+        x, y, target_label, masks = batch
         x = x.permute(1, 0, 2)
         src_mask = generate_square_subsequent_mask(x.size(0)).to(x.get_device())
         logits = self.forward(x, src_mask, masks, self.connectome.to(x.get_device()))
         loss = self.criterion(logits, y)
-        return loss, logits, y
+        l1loss = self.l1loss(logits, y)
+        return loss, l1loss, logits, y, target_label
 
     def training_step(self, batch, batch_idx):
-        loss, logits, targets = self.step(batch)
+        loss, l1loss, logits, targets, target_label = self.step(batch)
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False)
         return {"loss": loss, "logits": logits, "targets": targets}
 
 
     def validation_step(self, batch, batch_idx):
-        loss, logits, targets = self.step(batch)
+        loss, l1loss, logits, targets, target_label = self.step(batch)
         target_tau_positivity = (torch.mean(targets.float(), dim=1)>1.3).int()
         preds_tau_positivity = (torch.mean(logits.float(), dim=1) > 1.3).int()
         acc = self.val_acc(preds_tau_positivity, target_tau_positivity)
@@ -283,13 +288,20 @@ class TransformerModelFullConnFusion(pl.LightningModule):
         return {"loss": loss, "logits": logits, "targets": targets}
 
     def test_step(self, batch, batch_idx):
-        loss, logits, targets = self.step(batch)
-        target_tau_positivity = (torch.mean(targets.float(), dim=1)>1.3).int()
+        loss, l1loss, logits, targets, labels, target_label = self.step(batch)
+        target_tau_positivity = (torch.mean(targets.float(), dim=1) > 1.3).int()
         preds_tau_positivity = (torch.mean(logits.float(), dim=1) > 1.3).int()
         acc = self.test_acc(preds_tau_positivity, target_tau_positivity)
+        std = targets.std()
+        self.log("test_std", std, on_step=False, on_epoch=True, prog_bar=False)
+        self.log("test_l1_loss", l1loss, on_step=False, on_epoch=True, prog_bar=False)
         self.log("test_loss", loss, on_step=False, on_epoch=True, prog_bar=False)
         self.log("test_acc", acc, on_step=False, on_epoch=True, prog_bar=True)
-        return {"loss": loss, "logits": logits, "targets": targets}
+
+        with open('/u/home/bue/pickles/earlyfusion_'+str(batch_idx)+'.pickle', 'wb') as handle:
+            pickle.dump((batch[0].cpu(), logits.cpu(), targets.cpu()), handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        return {"loss": loss, "l1loss": l1loss, "logits": logits, "targets": targets}
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr, betas=(0.9, 0.98), eps=1e-9)

@@ -31,5 +31,5 @@ pudb            # debugger
 
 scikit-learn
 pandas
-
+matplotlib
 

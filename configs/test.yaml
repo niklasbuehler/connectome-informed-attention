@@ -3,8 +3,8 @@
 # specify here default evaluation configuration
 defaults:
   - _self_
-  - datamodule: modelnet.yaml # choose the datamodule for evaluation
-  - model: mvt.yaml
+  - datamodule: tau_progression_datamodule_transformer.yaml
+  - model: tau_progression_prediction_transformer_full_connectome_fusion.yaml
   - callbacks: null
   - logger: null
   - trainer: default.yaml
@@ -26,7 +26,12 @@ ignore_warnings: True
 
 seed: null
 
-name: "default"
+name: "connectome_fusion"
 
 # passing checkpoint path is necessary
-ckpt_path: /tmp/mvt/logs/experiments/runs/training/2022-08-07_19-35-58/checkpoints/epoch_005.ckpt
+ckpt_path: /u/home/bue/Documents/connectome-based-tau-spread-prediction/logs/experiments/runs/transformer_full_connectome_fusion/2022-12-19_23-00-39/checkpoints/epoch_083.ckpt
+#ckpt_path: /u/home/bue/Documents/connectome-based-tau-spread-prediction/logs/experiments/runs/transformer_full_connectome_fusion/2022-12-19_23-00-39/checkpoints/last.ckpt
+
+#ckpt_path: /u/home/bue/Documents/connectome-based-tau-spread-prediction/logs/experiments/runs/triformer/2023-01-12_17-10-01/checkpoints/epoch_019.ckpt
+
+#ckpt_path: /u/home/bue/Documents/connectome-based-tau-spread-prediction/logs/experiments/runs/multifusion/2023-01-20_07-56-04/checkpoints/epoch_017.ckpt

@@ -107,6 +107,7 @@ class TransformerModel(pl.LightningModule):
         self.decoder = nn.Linear(d_model, d_out)
 
         self.criterion = nn.MSELoss()
+        self.l1loss = nn.L1Loss()
         self.test_acc = Accuracy()
 
         self.init_weights()
@@ -142,23 +143,25 @@ class TransformerModel(pl.LightningModule):
         src_mask = generate_square_subsequent_mask(x.size(0))
         logits = self.forward(x.cuda(), src_mask.cuda())
         loss = self.criterion(logits, y)
-        return loss, logits, y
+        l1loss = self.l1loss(logits, y)
+        return loss, l1loss, logits, y
 
     def training_step(self, batch, batch_idx):
-        loss, logits, targets = self.step(batch)
+        loss, l1loss, logits, targets = self.step(batch)
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False)
         return {"loss": loss, "logits": logits, "targets": targets}
 
     def validation_step(self, batch, batch_idx):
-        loss, logits, targets = self.step(batch)
+        loss, l1loss, logits, targets = self.step(batch)
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=False)
         return {"loss": loss, "logits": logits, "targets": targets}
 
     def test_step(self, batch, batch_idx):
-        loss, logits, targets = self.step(batch)
+        loss, l1loss, logits, targets = self.step(batch)
         target_tau_positivity = (torch.mean(targets.float(), dim=1) > 1.3).int()
         preds_tau_positivity = (torch.mean(logits.float(), dim=1) > 1.3).int()
         acc = self.test_acc(preds_tau_positivity, target_tau_positivity)
+        self.log("test_l1_loss", l1loss, on_step=False, on_epoch=True, prog_bar=False)
         self.log("test_loss", loss, on_step=False, on_epoch=True, prog_bar=False)
         self.log("test_acc", acc, on_step=False, on_epoch=True, prog_bar=True)
         return {"loss": loss, "logits": logits, "targets": targets}
