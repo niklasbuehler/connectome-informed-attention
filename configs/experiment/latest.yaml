@@ -1,0 +1,14 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=connectivity_train
+
+defaults:
+  - override /datamodule: tau_progression_datamodule_transformer_latest.yaml
+  - override /model: tau_progression_prediction_transformer_full.yaml
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+# name of the run determines folder name in logs
+name: "latest"

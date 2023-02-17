@@ -34,16 +34,17 @@ class TauProgressionDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         sequence = self.sequences[index][0]
+        decoder_tgt = sequence[-1, :].reshape(1, 203)
         target = self.sequences[index][1]
 
-        return torch.from_numpy(sequence), torch.from_numpy(target)
+        return torch.from_numpy(sequence), torch.from_numpy(decoder_tgt), torch.from_numpy(target)
 
     def __len__(self):
         return len(self.sequences)
 
 
 
-class TauProgressionDataModuleTransformer(LightningDataModule):
+class TauProgressionDataModuleTransformerFullDecoder(LightningDataModule):
     def __init__(
             self,
             data_dir: str = "data/",
@@ -146,6 +147,7 @@ def collate(data, max_len=None):
     Args:
         data: len(batch_size) list of tuples (X, y).
             - X: torch tensor of shape (seq_length, feat_dim); variable seq_length.
+            - decoder_tgt: torch tensor of shape (1, feat_dim)
             - y: torch tensor of shape (num_labels,) : class indices or numerical targets
                 (for classification or regression, respectively). num_labels > 1 for multi-task models
         max_len: global fixed sequence length. Used for architectures requiring fixed length input,
@@ -160,10 +162,10 @@ def collate(data, max_len=None):
 
     batch_size = len(data)
     if batch_size>1:
-        features, labels = zip(*data)
+        features, decoder_tgts, labels = zip(*data)
     else:
-        features, labels = data[0]
-        features, labels = [features], [labels]
+        features, decoder_tgts, labels = data[0]
+        features, decoder_tgts, labels = [features], [decoder_tgts], [labels]
 
 
     # Stack and pad features and masks (convert 2D to 3D tensors, i.e. add batch dimension)
@@ -176,11 +178,11 @@ def collate(data, max_len=None):
         X[i, :end, :] = features[i][:end, :]
 
     targets = torch.stack(labels, dim=0)  # (batch_size, num_labels)
-
+    decoder_tgts = torch.stack(decoder_tgts, dim=0)
     padding_masks = padding_mask(torch.tensor(lengths, dtype=torch.int16),
                                  max_len=max_len)  # (batch_size, padded_length) boolean tensor, "1" means keep
 
-    return X, targets, padding_masks
+    return X, decoder_tgts, targets, padding_masks
 
 if __name__ == '__main__':
     ds = TauProgressionDataModuleTransformer(data_dir="/vol/chameleon/users/derbel/connectome-based-tau-spread-prediction/data", dataset_filename="tau_progression_sequences_test.csv", split_filename= "train_test_split_test.json", max_len=11, batch_size=1)
@@ -188,9 +190,4 @@ if __name__ == '__main__':
     dl = ds.test_dataloader()
     lens = []
     for x in dl:
-        print(x[0].shape)
-        print(x[1].shape)
-        print(x[2].shape)
         lens.append(x[2].shape[1])
-
-    print(max(lens))

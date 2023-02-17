@@ -162,8 +162,7 @@ class TransformerModelFull(pl.LightningModule):
                  activation: str = 'gelu',
                  transformer_dropout: float = 0.5,
                  dropout: float = 0.2,
-                 connectivity_path: str = None,
-                 variable: float=None):
+                 connectivity_path: str = None):
         super().__init__()
 
         #saves hparams to model checkpoint
@@ -200,16 +199,8 @@ class TransformerModelFull(pl.LightningModule):
         )
 
         self.activation = _get_activation_fn(activation)
-        connectivity = torch.from_numpy(pd.read_csv(connectivity_path).to_numpy().astype(np.float32))
-        conn_mean = connectivity.mean()
-        conn_var = connectivity.var()
 
-        # generates random values from a normal distributon with 0 mean and 1 variance
-        rand_conn =  torch.randn_like(connectivity)
-        # adjust mean and variance to connectivtiy properties
-        rand_conn = rand_conn * conn_var + conn_mean
-
-        self.register_buffer("connectivity", connectivity)
+        self.register_buffer("connectivity", torch.from_numpy(pd.read_csv(connectivity_path).to_numpy().astype(np.float32)))
 
 
         self.dropout = nn.Dropout(dropout)
@@ -281,8 +272,11 @@ class TransformerModelFull(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         loss, logits, targets = self.step(batch)
+        print(logits.shape)
         target_tau_positivity = (torch.mean(targets.float(), dim=1)>1.3).int()
         preds_tau_positivity = (torch.mean(logits.float(), dim=1) > 1.3).int()
+        print(preds_tau_positivity.shape)
+        raise  ValueError("c bon")
         acc = self.val_acc(preds_tau_positivity, target_tau_positivity)
         self.log("val_acc", acc, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=False)

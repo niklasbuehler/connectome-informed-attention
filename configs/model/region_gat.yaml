@@ -1,0 +1,14 @@
+_target_: src.models.region_gat.RegionGAT
+
+# Given
+d_in: 4
+d_out: 1
+
+# Tunable
+d_hid: 64
+nheads: 8
+lr: 0.0001
+dropout: 0.3
+connectivity_path: ${data_dir}/connectivity.csv
+
+

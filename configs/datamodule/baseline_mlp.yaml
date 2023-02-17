@@ -1,0 +1,7 @@
+_target_: src.datamodules.tau_progression_datamodule_mlp.TauProgressionDataModule
+
+##TODO: change params here
+data_dir: ${data_dir}
+batch_size: 32
+num_workers: 0
+pin_memory: False

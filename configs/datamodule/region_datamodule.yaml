@@ -1,10 +1,9 @@
-_target_: src.datamodules.tau_progression_datamodule_transformer.TauProgressionDataModuleTransformer
+_target_: src.datamodules.region_datamodule.RegionDatamodule
 
 ##TODO: change params here
 data_dir: ${data_dir}
 dataset_filename: tau_progression_sequences.csv
 split_filename: train_val_test_split.json
-batch_size: 64
-max_len: 10
+batch_size: 32
 num_workers: 0
 pin_memory: False

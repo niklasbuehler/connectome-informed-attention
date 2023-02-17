@@ -24,12 +24,13 @@ class TauProgressionDataset(torch.utils.data.Dataset):
         super().__init__()
 
         self.sequences = []
+
         seq_ids = list(sequence_dataset.SEQ_ID.unique())
 
         for id in seq_ids:
             data = sequence_dataset[sequence_dataset.SEQ_ID == id].drop(columns=["SEQ_ID"]).reset_index(drop=True)
             x = data.loc[:len(data) - 2].to_numpy().astype(np.float32)
-            y = data.loc[len(data) - 1].iloc[2:202].to_numpy().astype(np.float32)
+            y = data.loc[len(data) - 1].iloc[0:200].to_numpy().astype(np.float32)
             self.sequences.append((x, y))
 
     def __getitem__(self, index):
@@ -43,7 +44,7 @@ class TauProgressionDataset(torch.utils.data.Dataset):
 
 
 
-class TauProgressionDataModuleTransformer(LightningDataModule):
+class TauProgressionDataModuleTransformerExp(LightningDataModule):
     def __init__(
             self,
             data_dir: str = "data/",
@@ -52,7 +53,7 @@ class TauProgressionDataModuleTransformer(LightningDataModule):
             batch_size: int = 64,
             max_len: int = None,
             num_workers: int = 0,
-            pin_memory: bool = False,
+            pin_memory: bool = False
     ):
         super().__init__()
 
@@ -78,7 +79,8 @@ class TauProgressionDataModuleTransformer(LightningDataModule):
         # load datasets only if they're not loaded already
         if not self.data_train and not self.data_val and not self.data_test:
             dataset = pd.read_csv(os.path.join(self.hparams.data_dir, self.hparams.dataset_filename))
-
+            #change order
+            dataset = pd.concat((dataset.iloc[:, 0], dataset.iloc[:, -1], dataset.iloc[:, 5:-1], dataset.iloc[:, 1:5]), axis=1)
             #read subject-level dataset splits
             with open(os.path.join(self.hparams.data_dir, self.hparams.split_filename), "r") as f:
                 train_val_test_split = json.load(f)
@@ -181,6 +183,8 @@ def collate(data, max_len=None):
                                  max_len=max_len)  # (batch_size, padded_length) boolean tensor, "1" means keep
 
     return X, targets, padding_masks
+
+
 
 if __name__ == '__main__':
     ds = TauProgressionDataModuleTransformer(data_dir="/vol/chameleon/users/derbel/connectome-based-tau-spread-prediction/data", dataset_filename="tau_progression_sequences_test.csv", split_filename= "train_test_split_test.json", max_len=11, batch_size=1)

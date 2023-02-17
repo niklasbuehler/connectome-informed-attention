@@ -1,4 +1,4 @@
-_target_: src.datamodules.tau_progression_datamodule_transformer.TauProgressionDataModuleTransformer
+_target_: src.datamodules.tau_progression_datamodule_transformer_full_decoder.TauProgressionDataModuleTransformerFullDecoder
 
 ##TODO: change params here
 data_dir: ${data_dir}

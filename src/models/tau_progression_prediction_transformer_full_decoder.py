@@ -1,3 +1,5 @@
+import copy
+
 import math
 from typing import Any, Optional
 import pytorch_lightning as pl
@@ -11,9 +13,9 @@ from torchmetrics.classification.accuracy import Accuracy
 from torch.nn import TransformerEncoder, BatchNorm1d, TransformerEncoderLayer, Dropout, Linear, MultiheadAttention
 
 
-def generate_square_subsequent_mask(dim1:int, dim2:int) -> Tensor:
+def generate_square_subsequent_mask(sz: int) -> Tensor:
     """Generates an upper-triangular matrix of -inf, with zeros on diag."""
-    return torch.triu(torch.ones(dim1, dim2) * float('-inf'), diagonal=1)
+    return torch.triu(torch.ones(sz, sz) * float('-inf'), diagonal=1)
 
 
 class PositionalEncoding(nn.Module):
@@ -114,7 +116,7 @@ class TransformerBatchNormEncoderLayer(nn.modules.Module):
         return src
 
 
-class TransformerModelFull(pl.LightningModule):
+class TransformerModelFullDecoder(pl.LightningModule):
     """
     This module is an implementation of the Transformer architecture presented in the paper "Attention is All You Need".
     We don't use token embedding and replace this embedding step with simple feedforward embedding instead.
@@ -157,13 +159,15 @@ class TransformerModelFull(pl.LightningModule):
                  d_hid: int,
                  d_out: int,
                  n_encoder_heads: int,
+                 encoder_dropout: int,
                  n_encoder_layers: int,
+                 n_decoder_heads: int,
+                 decoder_dropout: int,
+                 n_decoder_layers: int,
                  lr: float,
                  activation: str = 'gelu',
-                 transformer_dropout: float = 0.5,
                  dropout: float = 0.2,
-                 connectivity_path: str = None,
-                 variable: float=None):
+                 connectivity_path: str = None):
         super().__init__()
 
         #saves hparams to model checkpoint
@@ -186,7 +190,7 @@ class TransformerModelFull(pl.LightningModule):
             d_model=d_model,
             nhead=n_encoder_heads,
             dim_feedforward=d_hid,
-            dropout=transformer_dropout,
+            dropout=encoder_dropout,
             activation=activation
         )
         self.transformer_encoder = TransformerEncoder(
@@ -194,22 +198,32 @@ class TransformerModelFull(pl.LightningModule):
             num_layers=n_encoder_layers
         )
 
+        self.decoder_input_layer = nn.Linear(
+            in_features=203,
+            out_features=d_model
+            )
+
+        decoder_layer = nn.TransformerDecoderLayer(
+            d_model=d_model,
+            nhead=n_decoder_heads,
+            dim_feedforward=d_hid,
+            dropout=decoder_dropout,
+            activation=activation
+            )
+
+        self.decoder = nn.TransformerDecoder(
+            decoder_layer=decoder_layer,
+            num_layers=n_decoder_layers,
+            )
+
         self.linear_mapping = nn.Linear(
-            in_features=(d_model*max_len),
+            in_features=d_model,
             out_features=200
         )
 
         self.activation = _get_activation_fn(activation)
-        connectivity = torch.from_numpy(pd.read_csv(connectivity_path).to_numpy().astype(np.float32))
-        conn_mean = connectivity.mean()
-        conn_var = connectivity.var()
 
-        # generates random values from a normal distributon with 0 mean and 1 variance
-        rand_conn =  torch.randn_like(connectivity)
-        # adjust mean and variance to connectivtiy properties
-        rand_conn = rand_conn * conn_var + conn_mean
-
-        self.register_buffer("connectivity", connectivity)
+        self.register_buffer("connectivity", torch.from_numpy(pd.read_csv(connectivity_path).to_numpy().astype(np.float32)))
 
 
         self.dropout = nn.Dropout(dropout)
@@ -228,7 +242,7 @@ class TransformerModelFull(pl.LightningModule):
         self.linear_mapping.bias.data.zero_()
         self.linear_mapping.weight.data.uniform_(-initrange, initrange)
 
-    def forward(self, src: Tensor, padding_masks: Tensor) -> Tensor:
+    def forward(self, src: Tensor, tgt, padding_masks: Tensor) -> Tensor:
         """
         Args:
             src: Tensor of shape [max_seq_len, batch_size, d_in]
@@ -240,28 +254,39 @@ class TransformerModelFull(pl.LightningModule):
         Returns:
             output: Tensor of shape [seq_len, batch_size, d_out]
         """
-        src = torch.cat((src, torch.matmul(src[:,:,2:202], self.connectivity)), dim=2)
+
+        #src = torch.cat((src, torch.matmul(src[:,:,2:202], self.connectivity)), dim=2)
+        #take last timestep for decoder input
+        #tgt[:,:,2:202] = torch.matmul(tgt[:,:,2:202], self.connectivity)
+
+
+        #encoder
         src = self.input_encoder(src) * math.sqrt(self.d_model)
         src = self.pos_encoder(src)
-        #(batch_size, seq_length, d_model) correct this
+        #(batch_size, seq_length, d_model) coorect this
         output = self.transformer_encoder(src, src_key_padding_mask=~padding_masks)
-        #TODO: investigate
-        output = self.activation(output)
-        output = output.permute(1, 0, 2)
+
+        #decoder
+        decoder_output = self.decoder_input_layer(tgt)
+        decoder_output = self.decoder(decoder_output, memory=output, memory_key_padding_mask=~padding_masks)
+
+        output = self.activation(decoder_output)
+        output = output.squeeze(0)
         output = self.dropout(output)
         # zero-out padding embeddings
-        output = output * padding_masks.unsqueeze(-1)
+        #output = output * padding_masks.unsqueeze(-1)
         # (batch_size, seq_length * d_model)
-        output = output.reshape(output.shape[0], -1)
+        #output = output.reshape(output.shape[0], -1)
         # (batch_size, 200)
         output = self.linear_mapping(output)
         return output
 
     def step(self, batch: Any):
-        x, y, src_padding_masks = batch
+        x, decoder_tgt, y, masks = batch
         x = x.permute(1, 0, 2)
-        #src_mask = generate_square_subsequent_mask(x.size(0), x.size(0)).to(x.get_device())
-        logits = self.forward(x, src_padding_masks)
+        decoder_tgt = decoder_tgt.permute(1, 0, 2)
+        #src_mask = generate_square_subsequent_mask(x.size(0)).to(x.get_device())
+        logits = self.forward(x, decoder_tgt, masks)
         loss = self.criterion(logits, y)
         return loss, logits, y
 

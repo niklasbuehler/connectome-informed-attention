@@ -1,3 +1,5 @@
+import copy
+
 import math
 from typing import Any, Optional
 import pytorch_lightning as pl
@@ -7,6 +9,7 @@ import pandas as pd
 from torch.nn import functional as F
 from src.utils.lr_scheduler import Scheduler
 from torch import nn, Tensor
+from src.models.components.connectivity_informed_attention import ConnectivityInformedAttention
 from torchmetrics.classification.accuracy import Accuracy
 from torch.nn import TransformerEncoder, BatchNorm1d, TransformerEncoderLayer, Dropout, Linear, MultiheadAttention
 
@@ -69,9 +72,14 @@ class TransformerBatchNormEncoderLayer(nn.modules.Module):
         activation: the activation function of intermediate layer, relu or gelu (default=relu).
     """
 
-    def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1, activation="relu"):
+    def __init__(self, d_model, nhead=None, dim_feedforward=2048, dropout=0.1, activation="relu", attention=None):
         super(TransformerBatchNormEncoderLayer, self).__init__()
-        self.self_attn = MultiheadAttention(d_model, nhead, dropout=dropout)
+        if not attention:
+            self.self_attn = MultiheadAttention(d_model, nhead, dropout=dropout)
+        else:
+            #for param in attention.parameters():
+            #    param.requires_grad = False
+            self.self_attn = attention
         # Implementation of Feedforward model
         self.linear1 = Linear(d_model, dim_feedforward)
         self.dropout = Dropout(dropout)
@@ -114,7 +122,7 @@ class TransformerBatchNormEncoderLayer(nn.modules.Module):
         return src
 
 
-class TransformerModelFull(pl.LightningModule):
+class TransformerModelFullConnectivity(pl.LightningModule):
     """
     This module is an implementation of the Transformer architecture presented in the paper "Attention is All You Need".
     We don't use token embedding and replace this embedding step with simple feedforward embedding instead.
@@ -158,12 +166,13 @@ class TransformerModelFull(pl.LightningModule):
                  d_out: int,
                  n_encoder_heads: int,
                  n_encoder_layers: int,
+                 #n_global_encoder_layers: int,
                  lr: float,
                  activation: str = 'gelu',
                  transformer_dropout: float = 0.5,
                  dropout: float = 0.2,
-                 connectivity_path: str = None,
-                 variable: float=None):
+                 attention_ckpt_path = "path/to/ckpt",
+                 connectivity_path: str = None):
         super().__init__()
 
         #saves hparams to model checkpoint
@@ -182,6 +191,7 @@ class TransformerModelFull(pl.LightningModule):
             out_features=d_model
         )
         self.pos_encoder = PositionalEncoding(d_model, dropout)
+
         encoder_layers = TransformerBatchNormEncoderLayer(
             d_model=d_model,
             nhead=n_encoder_heads,
@@ -194,22 +204,43 @@ class TransformerModelFull(pl.LightningModule):
             num_layers=n_encoder_layers
         )
 
+        connectivity_informed_attention = ConnectivityInformedAttention.load_from_checkpoint(attention_ckpt_path)
+        connectvity_d_model = connectivity_informed_attention.hparams.d_model
+        self.connectivity_encoder_input = connectivity_informed_attention.input_encoder
+        #self.connectivity_encoder_input.requires_grad_(False)
+        self.con_pos_encoder = PositionalEncoding(connectvity_d_model, dropout)
+        connectivity_encoder_layers = TransformerBatchNormEncoderLayer(
+            d_model=connectvity_d_model,
+            dim_feedforward=d_hid,
+            dropout=transformer_dropout,
+            activation=activation,
+            attention = connectivity_informed_attention.self_attn
+        )
+        self.connectivity_transformer_encoder = TransformerEncoder(
+            encoder_layer=connectivity_encoder_layers,
+            num_layers=n_encoder_layers
+        )
+
         self.linear_mapping = nn.Linear(
-            in_features=(d_model*max_len),
+            in_features=((connectvity_d_model+d_model)*max_len),
             out_features=200
         )
 
+        global_encoder_layers = TransformerBatchNormEncoderLayer(
+            d_model=d_model + connectvity_d_model,
+            nhead=n_encoder_heads,
+            dim_feedforward=d_hid,
+            dropout=transformer_dropout,
+            activation=activation
+        )
+        #self.global_transformer_encoder = TransformerEncoder(
+        #    encoder_layer=global_encoder_layers,
+        #    num_layers=n_global_encoder_layers
+        #)
+
         self.activation = _get_activation_fn(activation)
-        connectivity = torch.from_numpy(pd.read_csv(connectivity_path).to_numpy().astype(np.float32))
-        conn_mean = connectivity.mean()
-        conn_var = connectivity.var()
 
-        # generates random values from a normal distributon with 0 mean and 1 variance
-        rand_conn =  torch.randn_like(connectivity)
-        # adjust mean and variance to connectivtiy properties
-        rand_conn = rand_conn * conn_var + conn_mean
-
-        self.register_buffer("connectivity", connectivity)
+        self.register_buffer("connectivity", torch.from_numpy(pd.read_csv(connectivity_path).to_numpy().astype(np.float32)))
 
 
         self.dropout = nn.Dropout(dropout)
@@ -240,11 +271,29 @@ class TransformerModelFull(pl.LightningModule):
         Returns:
             output: Tensor of shape [seq_len, batch_size, d_out]
         """
-        src = torch.cat((src, torch.matmul(src[:,:,2:202], self.connectivity)), dim=2)
+        #connectivity input
+        connectivity_src = copy.deepcopy(src)
+        after_connectivity = torch.matmul(connectivity_src[:,:,2:202], self.connectivity)
+        after_connectivity = nn.functional.normalize(after_connectivity)
+        connectivity_src[:,:,2:202] = after_connectivity
+        connectivity_src = self.connectivity_encoder_input(connectivity_src) * math.sqrt(self.d_model)
+        connectivity_src = self.con_pos_encoder(connectivity_src)
+
+        #raw data input
         src = self.input_encoder(src) * math.sqrt(self.d_model)
         src = self.pos_encoder(src)
+
+        #raw data encoder
         #(batch_size, seq_length, d_model) correct this
-        output = self.transformer_encoder(src, src_key_padding_mask=~padding_masks)
+        output_raw = self.transformer_encoder(src, src_key_padding_mask=~padding_masks)
+
+        #connecitvity data encoder
+        #(batch_size, seq_length, d_model) correct this
+        output_connectivity = self.connectivity_transformer_encoder(connectivity_src, src_key_padding_mask=~padding_masks)
+
+        # concat
+        output = torch.cat((output_raw, output_connectivity), dim=2)
+        #output = self.global_transformer_encoder(output, src_key_padding_mask=~padding_masks)
         #TODO: investigate
         output = self.activation(output)
         output = output.permute(1, 0, 2)

@@ -1,0 +1,34 @@
+_target_: src.models.tau_progression_prediction_transformer_full_connectivity.TransformerModelFullConnectivity
+
+# Given
+d_in: 203
+d_out: 200
+
+# Tunable
+#d_model: 256
+#d_hid: 512
+#max_len: 10
+#n_encoder_heads: 2
+#n_encoder_layers: 3
+#lr: 0.0001
+#activation: "gelu"
+#transformer_dropout: 0.25696771128252627
+#dropout: 0.010604524216648726
+#connectivity_path: ${data_dir}/connectivity.csv
+
+# Tunable
+d_model: 256
+d_hid: 128
+max_len: 10
+n_encoder_heads: 2
+n_encoder_layers: 3
+lr: 0.0001
+activation: "gelu"
+transformer_dropout: 0.2304213003432401
+dropout: 0.06666588704431575
+attention_ckpt_path: /vol/chameleon/users/derbel/connectome-based-tau-spread-prediction/logs/experiments/runs/connectivity_informed/2023-01-15_22-17-00/checkpoints/epoch_185.ckpt
+#attention_ckpt_path: /vol/chameleon/users/derbel/connectome-based-tau-spread-prediction/logs/experiments/runs/connectivity_informed/2023-01-16_23-49-46/checkpoints/epoch_027.ckpt
+
+connectivity_path: ${data_dir}/connectivity.csv
+
+

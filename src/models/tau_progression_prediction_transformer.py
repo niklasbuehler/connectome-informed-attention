@@ -4,7 +4,6 @@ import pytorch_lightning as pl
 import torch
 from torch import nn, Tensor
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
-from torchmetrics import Accuracy
 
 
 def generate_square_subsequent_mask(sz: int) -> Tensor:
@@ -105,10 +104,7 @@ class TransformerModel(pl.LightningModule):
         encoder_layers = TransformerEncoderLayer(d_model, n_heads, d_hid, dropout)
         self.transformer_encoder = TransformerEncoder(encoder_layers, n_layers)
         self.decoder = nn.Linear(d_model, d_out)
-
         self.criterion = nn.MSELoss()
-        self.l1loss = nn.L1Loss()
-        self.test_acc = Accuracy()
 
         self.init_weights()
 
@@ -117,6 +113,10 @@ class TransformerModel(pl.LightningModule):
         self.encoder.weight.data.uniform_(-initrange, initrange)
         self.decoder.bias.data.zero_()
         self.decoder.weight.data.uniform_(-initrange, initrange)
+
+    def build_output_module(self, d_model, max_len, d_out):
+        output_layer = nn.Linear(d_model * max_len, d_out)
+        return output_layer
 
     def forward(self, src: Tensor, src_mask: Tensor) -> Tensor:
         """
@@ -128,7 +128,7 @@ class TransformerModel(pl.LightningModule):
                 earlier positions in the sequence.
 
         Returns:
-            output: Tensor of shape [batch_size, d_out]
+            output: Tensor of shape [seq_len, batch_size, d_out]
         """
         src = self.encoder(src) * math.sqrt(self.d_model)
         src = self.pos_encoder(src)
@@ -139,29 +139,32 @@ class TransformerModel(pl.LightningModule):
 
     def step(self, batch: Any):
         x, y, lengths = batch["data"], batch["label"], batch["lengths"]
+        #print(x.shape)
         x = x.permute(1, 0, 2)
         src_mask = generate_square_subsequent_mask(x.size(0))
-        logits = self.forward(x.cuda(), src_mask.cuda())
+        #print(src_mask.shape)
+        logits = self.forward(x, src_mask)
         loss = self.criterion(logits, y)
-        l1loss = self.l1loss(logits, y)
-        return loss, l1loss, logits, y
+        return loss, logits, y
 
     def training_step(self, batch, batch_idx):
-        loss, l1loss, logits, targets = self.step(batch)
+        loss, logits, targets = self.step(batch)
         self.log("train_loss", loss, on_step=False, on_epoch=True, prog_bar=False)
         return {"loss": loss, "logits": logits, "targets": targets}
 
+
     def validation_step(self, batch, batch_idx):
-        loss, l1loss, logits, targets = self.step(batch)
+        loss, logits, targets = self.step(batch)
         self.log("val_loss", loss, on_step=False, on_epoch=True, prog_bar=False)
         return {"loss": loss, "logits": logits, "targets": targets}
 
     def test_step(self, batch, batch_idx):
-        loss, l1loss, logits, targets = self.step(batch)
-        target_tau_positivity = (torch.mean(targets.float(), dim=1) > 1.3).int()
+        loss, logits, targets = self.step(batch)
+        print(logits.shape)
+        print(targets.shape)
+        target_tau_positivity = (torch.mean(targets.float(), dim=1)>1.3).int()
         preds_tau_positivity = (torch.mean(logits.float(), dim=1) > 1.3).int()
         acc = self.test_acc(preds_tau_positivity, target_tau_positivity)
-        self.log("test_l1_loss", l1loss, on_step=False, on_epoch=True, prog_bar=False)
         self.log("test_loss", loss, on_step=False, on_epoch=True, prog_bar=False)
         self.log("test_acc", acc, on_step=False, on_epoch=True, prog_bar=True)
         return {"loss": loss, "logits": logits, "targets": targets}

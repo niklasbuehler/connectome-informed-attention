@@ -1,7 +1,7 @@
-_target_: src.models.tau_progression_prediction_transformer_full.TransformerModelFull
+_target_: src.models.tau_progression_prediction_transformer_full_decoder.TransformerModelFullDecoder
 
 # Given
-d_in: 403
+d_in: 203
 d_out: 200
 
 # Tunable
@@ -17,16 +17,19 @@ d_out: 200
 #connectivity_path: ${data_dir}/connectivity.csv
 
 # Tunable
-d_model: 512
-d_hid: 512
+d_model: 128
+d_hid: 64
 max_len: 10
-n_encoder_heads: 8
-n_encoder_layers: 3
+n_encoder_heads: 2
+n_encoder_layers: 8
+n_decoder_heads: 8
+n_decoder_layers: 2
 lr: 0.0001
 activation: "gelu"
-transformer_dropout: 0.2819708330406043
-dropout: 0.01099820205599410
+encoder_dropout: 0.2
+decoder_dropout: 0.2
+dropout: 0.2
+
 connectivity_path: ${data_dir}/connectivity.csv
-variable: 0.1
 
 

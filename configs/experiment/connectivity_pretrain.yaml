@@ -1,0 +1,17 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=connectivity_pretrain
+
+defaults:
+  - override /datamodule: connectivity_informed_attention_datamodule.yaml
+  - override /model: connectivity_informed_attention.yaml
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+# name of the run determines folder name in logs
+name: "connectivity_informed"
+
+
+

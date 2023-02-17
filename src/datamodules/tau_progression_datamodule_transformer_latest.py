@@ -183,15 +183,15 @@ def collate(data, max_len=None):
 
     return X, targets, padding_masks
 
-#if __name__ == '__main__':
-#    ds = TauProgressionDataModuleTransformer(data_dir="/vol/chameleon/users/derbel/connectome-based-tau-spread-prediction/data", dataset_filename="tau_progression_sequences_test.csv", split_filename= "train_test_split_test.json", max_len=11, batch_size=1)
-#    ds.setup(stage="test")
-#    dl = ds.test_dataloader()
-#    lens = []
-#    for x in dl:
-#        print(x[0].shape)
-#        print(x[1].shape)
-#        print(x[2].shape)
-#        lens.append(x[2].shape[1])
-#
-#    print(max(lens))
+if __name__ == '__main__':
+    ds = TauProgressionDataModuleTransformer(data_dir="/vol/chameleon/users/derbel/connectome-based-tau-spread-prediction/data", dataset_filename="tau_progression_sequences_test.csv", split_filename= "train_test_split_test.json", max_len=11, batch_size=1)
+    ds.setup(stage="test")
+    dl = ds.test_dataloader()
+    lens = []
+    for x in dl:
+        print(x[0].shape)
+        print(x[1].shape)
+        print(x[2].shape)
+        lens.append(x[2].shape[1])
+
+    print(max(lens))
