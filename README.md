@@ -2,7 +2,9 @@
 
 ## Overview
 
----- write overview ----
+The required data can be obtained from the ![ADNI Project](http://adni.loni.usc.edu/).
+
+Exploratory notebooks can be found in the `notebooks` folder.
 
 ## How to install dependencies
 
