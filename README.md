@@ -1,9 +1,8 @@
-# connectome-based-tau-spread-prediction
+# Connectome Informed Attention — Predicting Tau Spreading for Alzheimer's Disease
 
 ## Overview
 
------ write overview ----
-
+---- write overview ----
 
 ## How to install dependencies
 
