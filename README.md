@@ -1,5 +1,7 @@
 # Connectome Informed Attention — Predicting Tau Spreading for Alzheimer's Disease
 
+![Project setup](./assets/setup.png)
+
 ## Overview
 
 This repository is structured as follows:
