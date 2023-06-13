@@ -2,9 +2,13 @@
 
 ## Overview
 
-The required data can be obtained from the ![ADNI Project](http://adni.loni.usc.edu/).
+This repository is structured as follows:
 
-Exploratory notebooks can be found in the `notebooks` folder.
+- `code`: The main code to train and evaluate the models.
+- `notebooks`: Exploratory and auxiliary Jupyter notebooks.
+- `presentations`: The presentations, as well as the final poster.
+
+The required data can be obtained from the [ADNI Project](http://adni.loni.usc.edu/).
 
 ## How to install dependencies
 
